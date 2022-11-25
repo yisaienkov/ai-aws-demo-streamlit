@@ -53,8 +53,17 @@ def vis_image(image: PngImageFile, col: DeltaGenerator, text: str) -> None:
 
 
 def get_predict_by_image_file(ip: str, port: str) -> PngImageFile:
-    response = requests.post(f"http://{ip}:{port}/api/v1/predict", files={"file": uploaded_file})
+    response = requests.post(f"http://{ip}:{port}/api/v1/predict/file", files={"file": uploaded_file})
     return Image.open(BytesIO(response.content))
+
+
+def get_predict_by_file_name(ip: str, port: str, file_name: str) -> str:
+    params = {
+        'file_name': file_name,
+    }
+
+    response = requests.get(f'http://{ip}:{port}/api/v1/predict/file_name', params=params)
+    return response.json()
 
 
 def get_image_download_link(img: PngImageFile, filename: str) -> str:
@@ -67,6 +76,7 @@ def get_image_download_link(img: PngImageFile, filename: str) -> str:
 
 if __name__ == "__main__":
     INPUT_FOLDER = "Inputs"
+    OUTPUT_FOLDER = "Outputs"
 
     BUCKET = os.getenv("BUCKET")
 
@@ -88,20 +98,27 @@ if __name__ == "__main__":
     if uploaded_file is not None:
         logger.info("Load image")
 
-        image = bytes_to_image(uploaded_file, logger)
+        input_image = bytes_to_image(uploaded_file, logger)
+        vis_image(input_image, before_col, "Before")
 
-        with BytesIO() as out_img:
-            image.save(out_img, format='PNG')
-            out_img.seek(0)  # Without this line it fails
+        out_img = BytesIO()
+        input_image.save(out_img, format='PNG')
+        out_img.seek(0)  # Without this line it fails
+
         file_name = hash(time.time())
         client.put_object(Body=out_img, Bucket=BUCKET,
                           Key=f'{INPUT_FOLDER}/{file_name}.jpg')
 
-        vis_image(image, before_col, "Before")
+        file_name_predict = get_predict_by_file_name(ip, port, file_name).get("file_name")
 
-        try:
-            predict_image = get_predict_by_image_file(ip, port)
-            vis_image(predict_image, after_col, "After")
-        except Exception as e:
-            logger.error(e)
-            st.error(e)
+        if file_name_predict:
+            try:
+                buffer = BytesIO()
+                client.download_fileobj(BUCKET, f'{OUTPUT_FOLDER}/{file_name_predict}.jpg', buffer)
+
+                output_image = bytes_to_image(buffer, logger)
+                vis_image(output_image, after_col, "After")
+            except Exception as e:
+                st.error(e)
+        else:
+            st.warning("Invalid prediction host")
