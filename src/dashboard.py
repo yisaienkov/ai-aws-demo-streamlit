@@ -80,17 +80,10 @@ if __name__ == "__main__":
 
     BUCKET = os.getenv("BUCKET")
 
-    ACCESS_KEY = os.getenv("ACCESS_KEY")
-    SECRET_KEY = os.getenv("SECRET_KEY")
-
     ip = os.getenv("IP")
     port = os.getenv("PORT")
 
-    client = boto3.client(
-        's3',
-        aws_access_key_id=ACCESS_KEY,
-        aws_secret_access_key=SECRET_KEY,
-    )
+    client = boto3.client('s3')
 
     uploaded_file = st.file_uploader("", type="jpg")
     before_col, after_col = st.columns(2)
